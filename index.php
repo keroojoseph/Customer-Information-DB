@@ -1,18 +1,14 @@
 <?php
 
+global $connection;
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 include_once 'Employees.php';
-$connection = null;
+include_once 'db.php';
+include_once 'AbstractModel.php';
 
-try {
-    $connection = new PDO('mysql:host=model.com;dbname=estore;port=3306;charset=utf8mb4', 'root', 'Keroo@30311152404778', array
-    (PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
-} catch (PDOException $e) {
-    echo('Sorry, something went wrong.');
-}
 
 global $id;
 
@@ -20,24 +16,16 @@ if (isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
     $id = filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT);
 
     if (is_numeric($id) && $id > 0) {
-        $sql = 'SELECT * FROM customer WHERE customer_id = ?';
-        $stmt = $connection->prepare($sql);
-        $foundUser = $stmt->execute([$id]);
-        if ($foundUser === true) {
-            $user = ($stmt->fetchAll(PDO::FETCH_CLASS | PDO::FETCH_PROPS_LATE, 'Employees', array('name', 'email')));
-            $user = array_shift($user);
-        }
+        $user = Employees::getByPk($id);
     }
 }
 
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     $id = filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT);
     if (is_numeric($id) && $id > 0) {
-        $sql = 'Delete FROM customer WHERE customer_id = ?';
-        $stmt = $connection->prepare($sql);
-        $foundUser = $stmt->execute([$id]);
-        if ($foundUser === true) {
-
+        $user = Employees::getByPk($id);
+        if ($user->delete() === true) {
+            $msg = 'Deleted successfully';
         }
     }
 }
@@ -48,22 +36,24 @@ try {
         $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
         $address = filter_input(INPUT_POST, 'address', FILTER_SANITIZE_SPECIAL_CHARS);
         $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_NUMBER_INT);
-        $employee = new Employees($name, $email);
-        $employee->address = $address;
-        $employee->phone = $phone;
-        $arr = [$name, $email, $address, $phone];
 
-        if (isset($user)) {
-            $sql = 'UPDATE customer SET name = ?, email = ? , address = ?, phone = ? where customer_id = ?';
-            $arr[4] = $id;
+        if (isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
+            $id = filter_input(INPUT_GET, 'id', FILTER_SANITIZE_NUMBER_INT);
+            if (is_numeric($id) && $id > 0) {
+                $user = Employees::getByPk($id);
+                $user->name = $name;
+                $user->email = $email;
+                $user->address = $address;
+                $user->phone = $phone;
+            }
         } else {
-            $sql = 'INSERT INTO customer (name, email, address, phone) VALUES (?, ?, ?, ?)';
+            $user = new Employees($name, $email, $address, $phone);
         }
 
-        $stm = $connection->prepare($sql);
+//        $stm = $connection->prepare($sql);
 
-        if ($stm->execute($arr)) {
-            $msg = 'Employee added';
+        if ($user->save() === true) {
+            $msg = 'Employee added successfully';
         } else {
             $error = true;
             $msg = 'An error occurred while adding employee.';
@@ -74,10 +64,8 @@ try {
     $msg = 'Database error';
 }
 
-$sql = 'SELECT * FROM customer';
-$stm = $connection->Query($sql);
-$result = $stm->fetchAll(PDO::FETCH_CLASS | PDO::FETCH_PROPS_LATE, 'Employees', array('name', 'email'));
-$result = ((is_array($result) && !empty($result))? $result : false);
+
+$result = Employees::getAll();
 ?>
 
 <!DOCTYPE thml>
